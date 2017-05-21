@@ -29,7 +29,14 @@ public struct JSON {
     public static var dateFormatter = DateFormatter()
     
     /// The object on which any subsequent method operates
-    public let object: AnyObject?
+    internal var _storedObject: Any?
+
+    /**
+     Creates an instance of JSON initialized to contain nil.
+     
+     - returns: the created JSON
+     */
+    public init() {}
 
     /**
         Creates an instance of JSON from AnyObject.
@@ -73,7 +80,7 @@ public struct JSON {
         - returns: the created JSON
     */
     internal init(object: Any?) {
-        self.object = object as AnyObject?
+        self._storedObject = object
     }
 }
 
@@ -88,13 +95,30 @@ extension JSON {
         - returns: a new instance of JSON or itself if its object is nil.
     */
     public subscript(index: String) -> JSON {
-        if object == nil { return self }
+        get {
+            if _storedObject == nil { return self }
 
-        if let nsDictionary = nsDictionary {
-            return JSON(nsDictionary[index])
+            if let nsDictionary = nsDictionary {
+                return JSON(nsDictionary[index])
+            }
+
+            return JSON(object: nil)
         }
-
-        return JSON(object: nil)
+        set {
+            if let value = newValue._storedObject {
+                if _storedObject == nil {
+                    _storedObject = NSDictionary(dictionary: [index: value])
+                    //                } else if let d = swiftDictionary {
+                    //                    var d = d
+                    //                    d[index] = value
+                    //                    _storedObject = d
+                } else if let d = nsDictionary {
+                    let d = NSMutableDictionary(dictionary: d)
+                    d[index] = value
+                    _storedObject = d
+                }
+            }
+        }
     }
 
     /**
@@ -105,13 +129,30 @@ extension JSON {
         - returns: a new instance of JSON or itself if its object is nil.
     */
     public subscript(index: Int) -> JSON {
-        if object == nil { return self }
+        get {
+            if _storedObject == nil { return self }
 
-        if let nsArray = nsArray {
-            return JSON(nsArray[safe: index])
+            if let nsArray = nsArray {
+                return JSON(nsArray[safe: index])
+            }
+
+            return JSON(object: nil)
         }
-
-        return JSON(object: nil)
+        set {
+            if let value = newValue._storedObject {
+                if _storedObject == nil {
+                    _storedObject = NSArray(array: [value])
+                    //                } else if let a = swiftArray {
+                    //                    var a = a
+                    //                    a[index] = value
+                    //                    _storedObject = a
+                } else if let a = nsArray {
+                    let a = NSMutableArray(array: a)
+                    a[index] = value
+                    _storedObject = a
+                }
+            }
+        }
     }
     
     /**
@@ -126,7 +167,7 @@ extension JSON {
     }
     
     internal subscript(indexes: [Any]) -> JSON {
-        if object == nil { return self }
+        if _storedObject == nil { return self }
         
         var json = self
         
@@ -151,20 +192,138 @@ extension JSON {
     }
 }
 
+// MARK: - Deserialize
+extension JSON {
+    
+    public func deserialize(nestLevel: Int = 0, _ withFormatting: Bool = true) -> String {
+        
+        var nestLevel = nestLevel
+        
+        var linefeed = ""
+        var tab = ""
+        var space = ""
+        
+        if withFormatting {
+            linefeed = "\n"
+            tab = "\t"
+            space = " "
+        }
+        
+        if let o = nsDictionary {
+            
+            var jsonString = "{\(linefeed)"
+            
+            nestLevel += 1
+            var nestString = ""
+            if withFormatting {
+                for _ in 0..<nestLevel {
+                    nestString += "\(tab)"
+                }
+            }
+            
+            o.forEach({ (k, v) in
+                jsonString += "\(nestString)\"\(k)\":\(space)\(JSON(v).deserialize(nestLevel: nestLevel, withFormatting)),\(linefeed)"
+            })
+            
+            if o.allKeys.count > 0 {
+                jsonString.remove(at: jsonString.index(before: jsonString.endIndex))
+            }
+            
+            if withFormatting {
+                
+                if o.allKeys.count > 0 {
+                    jsonString.remove(at: jsonString.index(before: jsonString.endIndex))
+                }
+                
+                jsonString += "\(linefeed)"
+                
+                for _ in 0..<nestLevel - 1 {
+                    jsonString += "\(tab)"
+                }
+            }
+            
+            jsonString += "}"
+            
+            return jsonString
+            
+        } else if let a = nsArray {
+            
+            var jsonString = "["
+            
+            nestLevel += 1
+            var nestString = ""
+            if withFormatting {
+                for _ in 0..<nestLevel {
+                    nestString += "\(tab)"
+                }
+            }
+            
+            a.forEach({ v in
+                jsonString += "\(linefeed)\(nestString)\(JSON(v).deserialize(nestLevel: nestLevel, withFormatting)),"
+            })
+            
+            if a.count > 0 {
+                jsonString.remove(at: jsonString.index(before: jsonString.endIndex))
+            }
+            
+            if withFormatting {
+                jsonString += "\(linefeed)"
+                
+                for _ in 0..<nestLevel - 1 {
+                    jsonString += "\(tab)"
+                }
+            }
+            
+            jsonString += "]"
+            
+            return jsonString
+            
+        } else if let s = string {
+            
+            return "\"\(s)\""
+            
+        } else if let d = double, fmod(d, 1) != 0 || d < Double(Int64.min) || d > Double(UInt64.max - 1024) {
+            
+            return "\(d)".lowercased()
+            
+        } else if let i = int {
+            
+            return "\(i)"
+            
+        } else if let i = int64 {
+            
+            return "\(i)"
+            
+        } else if let u = uInt64 {
+            
+            return "\(u)"
+            
+        } else if let b = bool {
+            
+            return "\(b)".lowercased()
+            
+        } else {
+            
+            return "null"
+            
+        }
+    }
+}
+
 // MARK: - Private extensions
 
 private extension JSON {
     /**
-        Converts an instance of NSData to AnyObject.
+        Converts an instance of Data to Any.
 
-        - parameter data: An instance of NSData or nil
+        - parameter data: An instance of Data or nil
 
-        - returns: An instance of AnyObject or nil
+        - returns: An instance of Any or nil
     */
     static func objectWithData(_ data: Data?) -> Any? {
         guard let data = data else { return nil }
-        
-        return try? JSONSerialization.jsonObject(with: data)
+
+        return try? JSONSerialization.jsonObject(with: data, options: .allowFragments)
     }
 }
 

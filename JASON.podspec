@@ -1,11 +1,11 @@
 Pod::Spec.new do |s|
   s.name         = "JASON"
-  s.version      = "3.1"
+  s.version      = "3.1.1"
   s.license      = { :type => "MIT" }
-  s.homepage     = "https://github.com/delba/JASON"
-  s.author       = { "Damien" => "damien@delba.io" }
+  s.homepage     = "https://github.com/dxpack/JASON"
+  s.author       = { "dxpack" => "dxpack@everythingismusic.com" }
   s.summary      = "Fast JSON parsing for Swift"
-  s.source       = { :git => "https://github.com/delba/JASON.git", :tag => "v3.1" }
+  s.source       = { :git => "https://github.com/dxpack/JASON.git", :tag => "v3.1.1" }
 
   s.ios.deployment_target = "8.0"
   s.osx.deployment_target = "10.9"
